@@ -467,8 +467,6 @@ onboarding-conflation-bias/
 │   ├── table07_track1_case_level_att.csv
 │   └── table08_track2_regression_comparison.csv
 │
-├── docs/                                   # supplementary notes (reserved for future manuscript drafts)
-│
 ├── pipeline/                               # ALL CORE SCRIPTS — already executed and validated.
 │   │                                        # Do not re-derive results by hand from this README;
 │   │                                        # every number above was produced by the script cited next to it.
