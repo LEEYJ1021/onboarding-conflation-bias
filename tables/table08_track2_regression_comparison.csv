@@ -1,0 +1,7 @@
+Outcome,Specification,Coefficient,p-value,Sig.,Shrinkage vs. unadjusted (%)
+log_spend_safe,Unadjusted,71.84112294518191,0.0004720641620052822,***,
+log_spend_safe,Adjusted (structural covariate),31.268860432284107,0.09607641789270034,,56.474983755273854
+log_spend_safe,Adjusted (outcome-window-excluded covariate),32.51887065749264,0.09351933612959785,,54.73501899141242
+n_campaign_types_active,Unadjusted,0.7527817662788978,5.383706577652457e-10,***,
+n_campaign_types_active,Adjusted (structural covariate),0.4957833124109118,1.5188466284286515e-06,***,34.13983512623641
+n_campaign_types_active,Adjusted (outcome-window-excluded covariate),0.49460502178445326,1.9620868597456796e-06,***,34.29635998898421
