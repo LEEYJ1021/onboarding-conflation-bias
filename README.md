@@ -41,7 +41,7 @@ This project began as an attempt to estimate the causal effect of a single adver
 32 nominal "new adopters" → 9 stacks with a usable pre-period → 7 within-customer switchers
 ```
 
-Diagnosing *why* this collapse happened is the actual contribution of this repository. The short version: a stable-observation-window filter, applied for the ordinary purpose of guaranteeing a clean panel, systematically **misclassifies new-customer onboarding as an existing-customer treatment-adoption event**. We name this **Onboarding Conflation Bias**, build a statistic (the **Born-Treated Ratio**) and a diagnostic procedure (the **Gap-Day Diagnostic**) to detect it, validate the mechanism with a closed-form Monte Carlo simulation, and show the bias reproduces at a statistically indistinguishable rate across four different campaign types on this platform (mean 81.3%, homogeneity test p > 0.14 for every gap-day threshold tested, both under asymptotic chi-square and a margin-fixed Monte Carlo exact test).
+Diagnosing *why* this collapse happened is the actual contribution of this repository. The short version: a stable-observation-window filter, applied for the ordinary purpose of guaranteeing a clean panel, systematically **misclassifies new-customer onboarding as an existing-customer treatment-adoption event**. We name this **Onboarding Conflation Bias**, build a statistic (the **Born-Treated Ratio**) and a diagnostic procedure (the **Gap-Day Diagnostic**) to detect it, validate the mechanism with a closed-form Monte Carlo simulation, and show the bias reproduces at a statistically indistinguishable rate across four different campaign types on this platform (mean 81.3%, homogeneity test p > 0.14 for every gap-day threshold tested, both under an asymptotic chi-square test and a margin-fixed Monte Carlo exact test).
 
 The failed original question is not thrown away — it becomes the running example ("Track 1") that shows the protocol correctly isolates the small set of customers for whom within-customer causal inference is even possible, while the discarded majority ("Track 2") is repurposed into an honest, appropriately-hedged descriptive comparison.
 
@@ -145,7 +145,7 @@ A separate check confirmed that the covariate used for adjustment (`customer_tot
 
 ## 9. Monte Carlo validation
 
-A single-plaform empirical finding of N=98 customers cannot, by itself, establish that Onboarding Conflation Bias is a *general* phenomenon rather than an artifact of this dataset. `mc_onboarding_conflation_bias.py` formalizes the data-generating process implied by the mechanism and validates both the mechanism and the diagnostic's behavior under it.
+A single-platform empirical finding of N=98 customers cannot, by itself, establish that Onboarding Conflation Bias is a *general* phenomenon rather than an artifact of this dataset. `mc_onboarding_conflation_bias.py` formalizes the data-generating process implied by the mechanism and validates both the mechanism and the diagnostic's behavior under it.
 
 **DGP.** `N_ADOPTERS=35` simulated adopters and `N_NEVER=61` never-treated customers (calibrated to the empirical robust cohort). A fraction `p_born` of adopters are born-treated (`gap = 0`, so their pre-period is structurally undefined); the remainder are true switchers with `gap` drawn from `[GAP_MIN, GAP_MAX]` days, set with an explicit safety margin (`GAP_MIN ≥ EVENT_WINDOW + NOVELTY_DURATION`) so that a true switcher's pre-period can never accidentally overlap the "novelty effect" window — a bug present in an earlier draft of this simulation is documented and fixed in the script's changelog, and a sanity check (`p_born=0` ⇒ Track 1 bias ≈ 0, within 3 Monte Carlo standard errors) is run automatically on every execution to guard against regression. `TRUE_EFFECT=0.15` is the ground-truth treatment effect; `NOVELTY_EFFECT=0.6` for the first `NOVELTY_DURATION=10` days after registration represents an onboarding-specific dynamic unrelated to treatment (e.g., a first-purchase / setup effect). 2,000 replications per grid point, `p_born ∈ {0, .2, .4, .6, .74, .8, .9, 1.0}` (0.74–0.80 matching the empirically observed range).
 
@@ -364,12 +364,14 @@ A naive staggered-adoption DiD on this platform's data would report 32 "new adop
 
 ## 19. Repository structure
 
+The pipeline is organized into six functional groups, executed strictly in order (Group A → Group F). Each group is self-contained: it reads only the outputs of earlier groups plus its own raw inputs, and writes outputs that later groups consume. A separate, non-overlapping companion pipeline (Group G) explores a secondary research question and is intentionally kept out of the main dependency chain (see [§21](#21-companion--exploratory-pipeline-not-part-of-the-main-paper)).
+
 ```
 onboarding-conflation-bias/
-├── README.md                          # this file
-├── config.py                          # shared paths/env-vars (AD_DATA_ROOT, STEP2_OUT, MC_OUT, REFRAME_OUT, ...)
+├── README.md                              # this file
+├── config.py                              # shared paths/env-vars (AD_DATA_ROOT, STEP2_OUT, MC_OUT, REFRAME_OUT, ...)
 │
-├── figures/                            # Figures 1–11 (PNG, referenced above; PDF companions produced by make_paper_assets.py)
+├── figures/                                # Figures 1–11 (PNG; PDF companions produced by make_paper_assets.py)
 │   ├── fig01_sample_selection_funnel.png
 │   ├── fig02_cohort_classification.png
 │   ├── fig03_gap_day_distribution.png
@@ -382,7 +384,7 @@ onboarding-conflation-bias/
 │   ├── fig10_track2_comparison.png
 │   └── fig11_diagnostic_protocol_flowchart.png
 │
-├── tables/                             # Tables 1–8 (CSV; .tex companions produced by make_paper_assets.py)
+├── tables/                                 # Tables 1–8 (CSV; .tex companions produced by make_paper_assets.py)
 │   ├── table01_sample_selection_stages.csv
 │   ├── table02_final_cohort_classification.csv
 │   ├── table03_cross_type_summary.csv
@@ -392,75 +394,101 @@ onboarding-conflation-bias/
 │   ├── table07_track1_case_level_att.csv
 │   └── table08_track2_regression_comparison.csv
 │
-├── docs/                               # this repository's supplementary notes (reserved for future manuscript drafts)
+├── docs/                                   # supplementary notes (reserved for future manuscript drafts)
 │
-│  ── Core pipeline scripts (ALREADY EXECUTED AND VALIDATED — do not re-derive results by re-reading
-│      this README's numbers by hand; every number above was produced by the script cited next to it) ──
+├── pipeline/                               # ALL CORE SCRIPTS — already executed and validated.
+│   │                                        # Do not re-derive results by hand from this README;
+│   │                                        # every number above was produced by the script cited next to it.
+│   │
+│   ├── group_a_data_integrity/             # A — Data integrity: build + independently re-verify the master panel
+│   │   ├── step1_data_integrity_build.py       # (a.k.a. step1a_build_master_dataset.py)
+│   │   │                                        #   builds df_analysis_master.csv (98 customers / 15,261 rows)
+│   │   └── step1_data_integrity_verify.py      # (a.k.a. step1b_verify_master_dataset.py)
+│   │                                            #   independently re-verifies the build manifest — PASS
+│   │
+│   ├── group_b_treatment_timing/           # B — Treatment-timing reconstruction (campaign type 6, the case study)
+│   │   ├── step2_1_treatment_first_attempt.py  # (a.k.a. step2a_naive_staggered_adoption.py)
+│   │   │                                        #   naive staggered-adoption attempt → 7 adopters, NOT_VIABLE
+│   │   ├── step2_2_left_censoring_recovery.py  # (a.k.a. step2b_left_censoring_recovery.py)
+│   │   │                                        #   left-censoring recovery + safety check → 32/3/2/61 final cohorts
+│   │   └── step2_3_pretrend_test.py            # (a.k.a. step2c_pretrend_test.py)
+│   │                                            #   formal pre-trend test → no significant pre-trend
+│   │
+│   ├── group_c_discovery_diagnostics/      # C — The discovery: gap-day diagnosis and the Track 1 / Track 2 split
+│   │   ├── step3_stacked_did_estimation.py     # (a.k.a. step3a_stacked_did_estimation.py)
+│   │   │                                        #   Step-C stacked-cohort DiD on 32-customer cohort → 9/32 valid stacks
+│   │   ├── step3b_stack_dropout_diagnosis.py   # diagnoses WHY 23/32 stacks are invalid → 100% = empty pre-period
+│   │   ├── step3c_born_treated_diagnosis.py    # computes gap_days for every adopter; confirms born-treated status
+│   │   ├── step3d_two_track_analysis.py        # Track 1 (n=7 true switchers) + Track 2 (n=28 born-treated, matched)
+│   │   ├── step3e_robustness_checks.py         # Track 1 LOO; Track 2 matching-window, covariate balance, adjustment
+│   │   ├── step3f_track1_alternative_threshold.py  # alternative gap threshold (3 days) re-estimation + LOO comparison
+│   │   └── step3g_track2_clean_covariate.py    # outcome-contamination-free covariate re-check (Track 2 adjustment)
+│   │
+│   ├── group_d_generalization_robustness/  # D — Cross-type generalization and threshold/homogeneity robustness
+│   │   ├── step2e_all_types_generalization.py  # cross-type replication (types 1/2/3/6) → 81.3% mean born-treated ratio
+│   │   ├── step2f_gap_threshold_sensitivity.py # gap-threshold (0/1/3/7 day) sensitivity of the born-treated ratio
+│   │   └── step2g_homogeneity_chisq_vs_exact.py# chi-square vs. margin-fixed Monte Carlo exact homogeneity test
+│   │
+│   ├── group_e_monte_carlo/                # E — Theoretical validation via simulation
+│   │   └── mc_onboarding_conflation_bias.py    # simulates the bias mechanism and validates the diagnostic under it
+│   │
+│   └── group_f_manuscript_assets/          # F — Read-only formatting layer (never re-derives numbers)
+│       └── make_paper_assets.py                # turns saved CSV/JSON into Figures 1–11 / Tables 1–8
 │
-├── step1_data_integrity_build.py       # (a.k.a. step1a_build_master_dataset.py) builds df_analysis_master.csv (98 customers / 15,261 rows)
-├── step1_data_integrity_verify.py      # (a.k.a. step1b_verify_master_dataset.py) independently re-verifies the build manifest — PASS
-│
-├── step2_1_treatment_first_attempt.py  # (a.k.a. step2a_naive_staggered_adoption.py) naive staggered-adoption attempt for type 6 → 7 adopters, NOT_VIABLE
-├── step2_2_left_censoring_recovery.py  # (a.k.a. step2b_left_censoring_recovery.py) left-censoring recovery + safety check → 32/3/2/61 final cohorts
-├── step2_3_pretrend_test.py            # (a.k.a. step2c_pretrend_test.py) formal pre-trend test → no significant pre-trend
-├── step2e_all_types_generalization.py  # cross-type replication (types 1/2/3/6) → 81.3% mean born-treated ratio
-├── step2f_gap_threshold_sensitivity.py # gap-threshold (0/1/3/7 day) sensitivity of the born-treated ratio
-├── step2g_homogeneity_chisq_vs_exact.py# chi-square vs. margin-fixed Monte Carlo exact test of cross-type homogeneity
-│
-├── step3_stacked_did_estimation.py     # (a.k.a. step3a_stacked_did_estimation.py) Step-C stacked-cohort DiD estimation on 32-customer cohort → 9/32 valid stacks
-├── step3b_stack_dropout_diagnosis.py   # diagnoses WHY 23/32 stacks are invalid → 100% = empty pre-period
-├── step3c_born_treated_diagnosis.py    # computes gap_days for every adopter, confirms 26/26 empty-pre-period cases are born-treated
-├── step3d_two_track_analysis.py        # Track 1 (n=7 true switchers) + Track 2 (n=28 born-treated, matched comparison)
-├── step3e_robustness_checks.py         # Track 1 leave-one-out; Track 2 matching-window sensitivity, covariate balance, regression adjustment
-├── step3f_track1_alternative_threshold.py  # alternative gap threshold (3 days) re-estimation + LOO comparison for Track 1
-├── step3g_track2_clean_covariate.py    # outcome-contamination-free covariate re-check for the Track 2 regression adjustment
-│
-├── mc_onboarding_conflation_bias.py    # Monte Carlo simulation validating the bias mechanism and the diagnostic's behavior under it
-├── make_paper_assets.py                # (not shown above as a numbered step — see §22) turns saved CSV/JSON into Figures 1–11 / Tables 1–8
-│
-│  ── Companion / exploratory pipeline (a separate, secondary research question — see §21;
-│      NOT part of the Onboarding Conflation Bias manuscript) ──
-│
-├── step0_reframe_sample_reconstruction.py
-├── step0b_first_channel_assignment.py
-├── step0c_cell_size_check.py
-├── step0d_arm_v2_promotion.py
-├── step1_omnibus_and_pairwise.py
-├── step1b_gap_sensitivity_check.py
-├── step2_heterogeneity_interactions.py
-└── step2a_diagnose_regmonth_cell_sizes.py
+└── companion_pipeline/                     # G — Companion / exploratory pipeline (secondary research question — §21)
+    │                                        #   NOT part of the Onboarding Conflation Bias manuscript
+    ├── step0_reframe_sample_reconstruction.py
+    ├── step0b_first_channel_assignment.py
+    ├── step0c_cell_size_check.py
+    ├── step0d_arm_v2_promotion.py
+    ├── step1_omnibus_and_pairwise.py
+    ├── step1b_gap_sensitivity_check.py
+    ├── step2_heterogeneity_interactions.py
+    └── step2a_diagnose_regmonth_cell_sizes.py
 ```
+
+**Group summary**
+
+| Group | Folder | Purpose | Key output |
+|---|---|---|---|
+| A | `group_a_data_integrity/` | Build the master panel and independently re-verify it | `df_analysis_master.csv` (98 × 15,261), manifest PASS |
+| B | `group_b_treatment_timing/` | Reconstruct true treatment timing for campaign type 6 via left-censoring recovery | 32/3/2/61 final cohort split; no pre-trend |
+| C | `group_c_discovery_diagnostics/` | Diagnose the stack-dropout problem, compute `gap_days`, run Track 1 / Track 2 | Born-Treated Ratio, Track 1 (n=7), Track 2 (n=28) |
+| D | `group_d_generalization_robustness/` | Replicate the diagnostic across all campaign types; test threshold and homogeneity robustness | 81.3% mean ratio, homogeneous across types/thresholds |
+| E | `group_e_monte_carlo/` | Validate the mechanism theoretically, independent of this dataset | Track 1 bias ≈ 0 / SE understatement; Track 2 bias ≈ +0.20 |
+| F | `group_f_manuscript_assets/` | Format already-computed results into figures/tables | `figures/*.png`, `tables/*.csv` |
+| G | `companion_pipeline/` | Secondary, non-overlapping research question (excluded from the manuscript) | Exploratory only — not cited in §14–15 |
 
 ## 20. Code-to-result mapping
 
 **No result in this document was computed fresh for the README.** Every number, table, and figure was produced by re-reading the already-saved CSV/JSON outputs of the scripts below; `make_paper_assets.py` is explicitly designed to *not* re-run the underlying analysis pipeline, so that formatting figures/tables for the manuscript carries zero risk of silently re-deriving (and possibly changing) a result.
 
-| Result | Produced by | Reads from |
-|---|---|---|
-| §6 sample funnel / Table 1 / Figure 1 | `step1_data_integrity_build.py` (build) → `step1_data_integrity_verify.py` (independent re-check, PASS) | `customer_day_panel.csv`, `customer_day_campaign_type_panel.csv`, `customer_level_attributes.csv` |
-| §7 naive attempt (7 adopters) | `step2_1_treatment_first_attempt.py` | `df_analysis_master.csv` |
-| §7 left-censoring recovery / Table 2 / Figure 2 | `step2_2_left_censoring_recovery.py` | raw panel + `df_analysis_master.csv` |
-| §7 pre-trend test | `step2_3_pretrend_test.py` | event-time panels from step2_2 |
-| §7 Step-C stacked DiD (9/32 valid) | `step3_stacked_did_estimation.py` | `staggered_adoption_FINAL_type6.csv` |
-| §7 stack-dropout diagnosis | `step3b_stack_dropout_diagnosis.py` | outputs of step3 |
-| §8 born-treated diagnosis / gap_days / Figure 3 | `step3c_born_treated_diagnosis.py` | raw panel, `staggered_adoption_FINAL_type6.csv`, step3b output |
-| §8 Track 1 & Track 2 / Table 7 / Figure 9 / Figure 10 | `step3d_two_track_analysis.py` | step3c output |
-| §8 Track 1 LOO / Track 2 matching & covariate checks | `step3e_robustness_checks.py` | step3d output |
-| §8 Track 1 alternative threshold | `step3f_track1_alternative_threshold.py` | step3c/step3d output |
-| §8 Track 2 clean-covariate re-check / Table 8 | `step3g_track2_clean_covariate.py` | step3e output |
-| §9 Monte Carlo simulation / Table 6 / Figures 6–8 | `mc_onboarding_conflation_bias.py` | (self-contained simulation) |
-| §10 cross-type generalization / Table 3 / Figure 4 | `step2e_all_types_generalization.py` | `df_analysis_master.csv`, raw panel |
-| §11 gap-threshold sensitivity / Table 5 / Figure 5 | `step2f_gap_threshold_sensitivity.py` | step2e output (`born_treated_diagnosis_type{T}.csv`) |
-| §10 homogeneity chi-square vs. exact / Table 4 | `step2g_homogeneity_chisq_vs_exact.py` | step2f output |
-| Figures 1–11 (formatting only) | `make_paper_assets.py` | all of the above (read-only; never re-runs analysis) |
+| Result | Group | Produced by | Reads from |
+|---|---|---|---|
+| §6 sample funnel / Table 1 / Figure 1 | A | `step1_data_integrity_build.py` (build) → `step1_data_integrity_verify.py` (independent re-check, PASS) | `customer_day_panel.csv`, `customer_day_campaign_type_panel.csv`, `customer_level_attributes.csv` |
+| §7 naive attempt (7 adopters) | B | `step2_1_treatment_first_attempt.py` | `df_analysis_master.csv` |
+| §7 left-censoring recovery / Table 2 / Figure 2 | B | `step2_2_left_censoring_recovery.py` | raw panel + `df_analysis_master.csv` |
+| §7 pre-trend test | B | `step2_3_pretrend_test.py` | event-time panels from step2_2 |
+| §7 Step-C stacked DiD (9/32 valid) | C | `step3_stacked_did_estimation.py` | `staggered_adoption_FINAL_type6.csv` |
+| §7 stack-dropout diagnosis | C | `step3b_stack_dropout_diagnosis.py` | outputs of step3 |
+| §8 born-treated diagnosis / gap_days / Figure 3 | C | `step3c_born_treated_diagnosis.py` | raw panel, `staggered_adoption_FINAL_type6.csv`, step3b output |
+| §8 Track 1 & Track 2 / Table 7 / Figure 9 / Figure 10 | C | `step3d_two_track_analysis.py` | step3c output |
+| §8 Track 1 LOO / Track 2 matching & covariate checks | C | `step3e_robustness_checks.py` | step3d output |
+| §8 Track 1 alternative threshold | C | `step3f_track1_alternative_threshold.py` | step3c/step3d output |
+| §8 Track 2 clean-covariate re-check / Table 8 | C | `step3g_track2_clean_covariate.py` | step3e output |
+| §9 Monte Carlo simulation / Table 6 / Figures 6–8 | E | `mc_onboarding_conflation_bias.py` | (self-contained simulation) |
+| §10 cross-type generalization / Table 3 / Figure 4 | D | `step2e_all_types_generalization.py` | `df_analysis_master.csv`, raw panel |
+| §11 gap-threshold sensitivity / Table 5 / Figure 5 | D | `step2f_gap_threshold_sensitivity.py` | step2e output (`born_treated_diagnosis_type{T}.csv`) |
+| §10 homogeneity chi-square vs. exact / Table 4 | D | `step2g_homogeneity_chisq_vs_exact.py` | step2f output |
+| Figures 1–11 (formatting only) | F | `make_paper_assets.py` | all of the above (read-only; never re-runs analysis) |
 
 ## 21. Companion / exploratory pipeline (not part of the main paper)
 
-During scoping, a second research question was explored — "does a new customer's *first-chosen* campaign type predict their early growth trajectory?" — using the same underlying panel but a completely re-derived, non-overlapping sample (`clean_onboarding_sample`, n=92, built without the 30-day stability filter that causes Onboarding Conflation Bias in the first place, since this design's outcome variable is measurement, not treatment-timing, and does not need it). This produced one robust finding (portfolio-breadth differences across first-campaign-type groups, robust across all four observation windows tested: 7/14/30/60 days) and one fragile, window-dependent finding (a 60-day cumulative-spend difference that is not robust to including a single outlier customer with a 34-day registration-to-activation gap). Because its strongest confirmed result is narrower than the Onboarding Conflation Bias discovery and its overall evidentiary profile is weaker (a single, largely-associational finding vs. a named, formalized, Monte-Carlo-validated, cross-type-replicated phenomenon), it was **deliberately scoped out of the target manuscript** and is retained in this repository only as a secondary, exploratory pipeline (`step0*`, `step1_omnibus_and_pairwise.py`, `step1b_gap_sensitivity_check.py`, `step2_heterogeneity_interactions.py`, `step2a_diagnose_regmonth_cell_sizes.py`) for transparency and potential future use — e.g., as a validated illustration that the Gap-Day-style diagnostic reasoning generalizes to sample-construction problems beyond the born-treated case specifically (this pipeline independently discovers and documents its own version of an outcome-contamination risk and its own small-cell/rank-deficiency diagnostics). **None of its figures or tables appear in Sections 14–15 above**, and none of its results should be cited as part of the Onboarding Conflation Bias findings.
+During scoping, a second research question was explored — "does a new customer's *first-chosen* campaign type predict their early growth trajectory?" — using the same underlying panel but a completely re-derived, non-overlapping sample (`clean_onboarding_sample`, n=92, built without the 30-day stability filter that causes Onboarding Conflation Bias in the first place, since this design's outcome variable is measurement, not treatment-timing, and does not need it). This produced one robust finding (portfolio-breadth differences across first-campaign-type groups, robust across all four observation windows tested: 7/14/30/60 days) and one fragile, window-dependent finding (a 60-day cumulative-spend difference that is not robust to including a single outlier customer with a 34-day registration-to-activation gap). Because its strongest confirmed result is narrower than the Onboarding Conflation Bias discovery and its overall evidentiary profile is weaker (a single, largely-associational finding vs. a named, formalized, Monte-Carlo-validated, cross-type-replicated phenomenon), it was **deliberately scoped out of the target manuscript** and is retained in this repository only as a secondary, exploratory pipeline (Group G — `companion_pipeline/`) for transparency and potential future use — e.g., as a validated illustration that the Gap-Day-style diagnostic reasoning generalizes to sample-construction problems beyond the born-treated case specifically (this pipeline independently discovers and documents its own version of an outcome-contamination risk and its own small-cell/rank-deficiency diagnostics). **None of its figures or tables appear in Sections 14–15 above**, and none of its results should be cited as part of the Onboarding Conflation Bias findings.
 
 ## 22. Reproducibility framework
 
-**Everything in `figures/` and `tables/` is downstream of already-executed and already-verified code.** To reproduce from scratch:
+**Everything in `figures/` and `tables/` is downstream of already-executed and already-verified code.** To reproduce from scratch, run the groups strictly in order (A → F); Group G is independent and optional.
 
 ```bash
 export AD_DATA_ROOT="/path/to/master_dataset"
@@ -468,34 +496,38 @@ export STEP2_OUT="$AD_DATA_ROOT/step2_treatment_output"      # default shown; ov
 export MC_OUT="./mc_output"
 export PAPER_ASSETS_OUT="./paper_assets"
 
-# 1) Data integrity
-python step1_data_integrity_build.py
-python step1_data_integrity_verify.py        # must print "PASS" before proceeding
+# Group A — Data integrity
+python pipeline/group_a_data_integrity/step1_data_integrity_build.py
+python pipeline/group_a_data_integrity/step1_data_integrity_verify.py     # must print "PASS" before proceeding
 
-# 2) Treatment-timing reconstruction (campaign type 6, the discovery case study)
-python step2_1_treatment_first_attempt.py    # confirms naive attempt is NOT_VIABLE (n=7)
-python step2_2_left_censoring_recovery.py    # recovers 32/3/2/61 final cohorts
-python step2_3_pretrend_test.py              # confirms no pre-trend
+# Group B — Treatment-timing reconstruction (campaign type 6, the discovery case study)
+python pipeline/group_b_treatment_timing/step2_1_treatment_first_attempt.py   # confirms naive attempt is NOT_VIABLE (n=7)
+python pipeline/group_b_treatment_timing/step2_2_left_censoring_recovery.py   # recovers 32/3/2/61 final cohorts
+python pipeline/group_b_treatment_timing/step2_3_pretrend_test.py            # confirms no pre-trend
 
-# 3) The discovery
-python step3_stacked_did_estimation.py       # Step-C DiD: only 9/32 stacks valid
-python step3b_stack_dropout_diagnosis.py     # WHY: 100% empty-pre-period
-python step3c_born_treated_diagnosis.py      # gap_days computed; born-treated confirmed
-python step3d_two_track_analysis.py          # Track 1 (n=7) / Track 2 (n=28)
-python step3e_robustness_checks.py           # LOO, matching-window, covariate balance, adjustment
-python step3f_track1_alternative_threshold.py
-python step3g_track2_clean_covariate.py
+# Group C — The discovery: stack dropout, gap-day diagnosis, Track 1 / Track 2
+python pipeline/group_c_discovery_diagnostics/step3_stacked_did_estimation.py        # Step-C DiD: only 9/32 stacks valid
+python pipeline/group_c_discovery_diagnostics/step3b_stack_dropout_diagnosis.py      # WHY: 100% empty-pre-period
+python pipeline/group_c_discovery_diagnostics/step3c_born_treated_diagnosis.py       # gap_days computed; born-treated confirmed
+python pipeline/group_c_discovery_diagnostics/step3d_two_track_analysis.py           # Track 1 (n=7) / Track 2 (n=28)
+python pipeline/group_c_discovery_diagnostics/step3e_robustness_checks.py            # LOO, matching-window, covariate balance, adjustment
+python pipeline/group_c_discovery_diagnostics/step3f_track1_alternative_threshold.py
+python pipeline/group_c_discovery_diagnostics/step3g_track2_clean_covariate.py
 
-# 4) Generalization and robustness
-python step2e_all_types_generalization.py    # replicate across types 1/2/3/6
-python step2f_gap_threshold_sensitivity.py   # 0/1/3/7-day threshold sensitivity
-python step2g_homogeneity_chisq_vs_exact.py  # chi-square vs. Monte Carlo exact
+# Group D — Generalization and robustness
+python pipeline/group_d_generalization_robustness/step2e_all_types_generalization.py    # replicate across types 1/2/3/6
+python pipeline/group_d_generalization_robustness/step2f_gap_threshold_sensitivity.py   # 0/1/3/7-day threshold sensitivity
+python pipeline/group_d_generalization_robustness/step2g_homogeneity_chisq_vs_exact.py  # chi-square vs. Monte Carlo exact
 
-# 5) Theoretical validation
-python mc_onboarding_conflation_bias.py      # Monte Carlo — check "Sanity check ... PASS" in the log
+# Group E — Theoretical validation
+python pipeline/group_e_monte_carlo/mc_onboarding_conflation_bias.py   # Monte Carlo — check "Sanity check ... PASS" in the log
 
-# 6) Manuscript assets (read-only formatting layer — never re-derives numbers)
-python make_paper_assets.py                  # → paper_assets/figures, paper_assets/tables, generation_log.json
+# Group F — Manuscript assets (read-only formatting layer — never re-derives numbers)
+python pipeline/group_f_manuscript_assets/make_paper_assets.py   # → paper_assets/figures, paper_assets/tables, generation_log.json
+
+# Group G — Companion / exploratory pipeline (optional, not part of the main manuscript)
+# python companion_pipeline/step0_reframe_sample_reconstruction.py
+# ... (see §21; run independently, not required for Groups A–F)
 ```
 
 Each script is idempotent given the same inputs and prints its own verification/sanity checks to the console (e.g., the data-integrity re-verify script prints an explicit `PASS`/`FAIL`; the Monte Carlo script prints an explicit sanity-check pass/fail before reporting any substantive numbers). All environment variables have documented defaults inside each script; none of the reported figures/tables require any manual post-processing beyond what `make_paper_assets.py` performs automatically.
