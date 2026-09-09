@@ -2,7 +2,7 @@
 
 **A structural treatment-misclassification problem in observational platform panels, and a diagnostic protocol to detect and correct it.**
 
-> This repository contains the full, already-executed analysis pipeline — data-integrity verification, treatment-timing reconstruction, the discovery and formalization of *Onboarding Conflation Bias*, Monte Carlo validation, cross-type generalization, and two downstream demonstration analyses (Track 1 / Track 2) — together with every figure, table, and script that produced them.
+> This repository contains the full, already-executed analysis pipeline — data-integrity verification, treatment-timing reconstruction, the discovery and formalization of *Onboarding Conflation Bias*, Monte Carlo validation, cross-type generalization, two downstream demonstration analyses (Track 1 / Track 2), and a robustness appendix quantifying classification and confounding uncertainty — together with every figure, table, and script that produced them.
 
 ---
 
@@ -30,6 +30,10 @@
 20. [Code-to-result mapping](#20-code-to-result-mapping)
 21. [Companion / exploratory pipeline (not part of the main paper)](#21-companion--exploratory-pipeline-not-part-of-the-main-paper)
 22. [Reproducibility framework](#22-reproducibility-framework)
+23. [Robustness appendix: is the discrete gap-day threshold defensible, and how confounding-robust is Track 2?](#23-robustness-appendix-is-the-discrete-gap-day-threshold-defensible-and-how-confounding-robust-is-track-2)
+    - [23.1 Feature-based mixture reformulation of the gap-day threshold](#231-is-the-discrete-threshold-justified-or-is-it-hiding-a-continuum-table-9-table-10-figure-12-figure-12b)
+    - [23.2 KL-DRO worst-case confounding bound on Track 2](#232-how-much-unobserved-confounding-can-track-2-tolerate-table-11-table-12-figure-13-figure-14)
+    - [23.3 Suggested placement in the manuscript](#233-suggested-placement-in-the-manuscript)
 
 ---
 
@@ -41,7 +45,7 @@ This project began as an attempt to estimate the causal effect of a single adver
 32 nominal "new adopters" → 9 stacks with a usable pre-period → 7 within-customer switchers
 ```
 
-Diagnosing *why* this collapse happened is the actual contribution of this repository. The short version: a stable-observation-window filter, applied for the ordinary purpose of guaranteeing a clean panel, systematically **misclassifies new-customer onboarding as an existing-customer treatment-adoption event**. We name this **Onboarding Conflation Bias**, build a statistic (the **Born-Treated Ratio**) and a diagnostic procedure (the **Gap-Day Diagnostic**) to detect it, validate the mechanism with a closed-form Monte Carlo simulation, and show the bias reproduces at a statistically indistinguishable rate across four different campaign types on this platform (mean 81.3%, homogeneity test p > 0.14 for every gap-day threshold tested, both under an asymptotic chi-square test and a margin-fixed Monte Carlo exact test).
+Diagnosing *why* this collapse happened is the actual contribution of this repository. The short version: a stable-observation-window filter, applied for the ordinary purpose of guaranteeing a clean panel, systematically **misclassifies new-customer onboarding as an existing-customer treatment-adoption event**. We name this **Onboarding Conflation Bias**, build a statistic (the **Born-Treated Ratio**) and a diagnostic procedure (the **Gap-Day Diagnostic**) to detect it, validate the mechanism with a closed-form Monte Carlo simulation, and show the bias reproduces at a statistically indistinguishable rate across four different campaign types on this platform (mean 81.3%, homogeneity test p > 0.14 for every gap-day threshold tested, both under an asymptotic chi-square test and a margin-fixed Monte Carlo exact test). A robustness appendix ([§23](#23-robustness-appendix-is-the-discrete-gap-day-threshold-defensible-and-how-confounding-robust-is-track-2)) further tests whether the discrete gap-day cutoff is defensible against a continuous latent-class alternative, and how much unobserved confounding the downstream Track 2 comparison can tolerate.
 
 The failed original question is not thrown away — it becomes the running example ("Track 1") that shows the protocol correctly isolates the small set of customers for whom within-customer causal inference is even possible, while the discarded majority ("Track 2") is repurposed into an honest, appropriately-hedged descriptive comparison.
 
@@ -65,7 +69,7 @@ Every stage of that flowchart corresponds to a script in this repository (see [�
 
 **Onboarding Conflation Bias.** The systematic misclassification of a new customer's account-opening / onboarding event as an existing customer's treatment-adoption event, arising from the interaction between (a) an observation-window sample-selection rule and (b) continuous ("rolling-admission") customer entry into the panel. It results in inflated nominal adopter counts, collapsed effective (within-customer-identifiable) sample sizes, and, if unaddressed, standard-error understatement and/or non-causal "effects" driven by onboarding-specific dynamics rather than the treatment itself.
 
-**Born-treated (customer).** A customer whose first appearance in the raw, unfiltered panel (`raw_panel_date_min`) coincides with (or is within a small tolerance of) their first-recorded activation of the focal treatment — i.e., there is no pre-treatment history to observe because the customer's panel history *begins* with the treatment already active. Formally, letting `gap_days = first_treated_date − raw_panel_date_min`, a customer is classified born-treated when `gap_days ≤ GAP_THRESHOLD` (adopted value: 1 day; see [§11](#11-gap-threshold-sensitivity) for the sensitivity of every downstream result to this choice).
+**Born-treated (customer).** A customer whose first appearance in the raw, unfiltered panel (`raw_panel_date_min`) coincides with (or is within a small tolerance of) their first-recorded activation of the focal treatment — i.e., there is no pre-treatment history to observe because the customer's panel history *begins* with the treatment already active. Formally, letting `gap_days = first_treated_date − raw_panel_date_min`, a customer is classified born-treated when `gap_days ≤ GAP_THRESHOLD` (adopted value: 1 day; see [§11](#11-gap-threshold-sensitivity) for the sensitivity of every downstream result to this choice, and [§23.1](#231-is-the-discrete-threshold-justified-or-is-it-hiding-a-continuum-table-9-table-10-figure-12-figure-12b) for a formal test of whether a continuous reformulation is warranted instead).
 
 **True switcher.** A customer with `gap_days > GAP_THRESHOLD` — i.e., a genuine pre-existing customer who later added the focal treatment, for whom a within-customer pre/post comparison is meaningful.
 
@@ -91,7 +95,7 @@ Every stage of that flowchart corresponds to a script in this repository (see [�
 
 **P5 (Track 2 consequence — genuine bias risk).** Because a cross-sectional comparison of born-treated units against a matched control group cannot difference away an onboarding-specific ("novelty") effect, estimates from this design will be biased upward in the direction of any such effect and can appear spuriously "significant" at conventional thresholds even when no genuine treatment effect exists.
 
-All five propositions are evaluated below and, for P1–P4, supported by both the empirical cross-type analysis and the Monte Carlo simulation; P5 motivates — but is intentionally not adjudicated as a causal claim by — the Track 2 demonstration.
+All five propositions are evaluated below and, for P1–P4, supported by both the empirical cross-type analysis and the Monte Carlo simulation; P5 motivates — but is intentionally not adjudicated as a causal claim by — the Track 2 demonstration, and is further quantified (not just motivated) in [§23.2](#232-how-much-unobserved-confounding-can-track-2-tolerate-table-11-table-12-figure-13-figure-14).
 
 ## 6. Data and sample construction
 
@@ -139,7 +143,7 @@ Once every recovered adopter has a `gap_days` value, the diagnostic routes them:
 
 - **`gap_days > threshold` → Track 1 (True Switchers).** A within-customer stacked DiD is run on this subgroup only. For campaign type 6 this leaves **n = 7**. Leave-one-out (LOO) sensitivity analysis shows the sign of the pooled ATT is reasonably stable (1/7 sign flips for cumulative log-spend, 0/7 for portfolio breadth), but the sample is explicitly reported as **case-level / exploratory evidence, not a formal causal estimate** — with all seven individual case-level ATTs shown transparently in [Table 7](#table-7) / [Figure 9](#figure-9). An alternative gap threshold (3 days instead of 1) was tested as a robustness check and, counter to the initial hypothesis that it would remove noisy edge cases, produced a comparably unstable (in fact slightly *more* LOO-unstable for one outcome) n=5 subsample with one coefficient flipping into nominal significance (p=0.022) purely as an artifact of having tried multiple thresholds on a tiny sample — this negative result is reported explicitly as a caution against over-interpreting small-sample threshold-shopping, not as a new finding.
 
-- **`gap_days ≤ threshold` → Track 2 (Born-Treated).** These customers cannot supply a within-customer pre-period by construction, so they are instead compared cross-sectionally against never-treated customers who registered within a matched calendar window (`REG_MATCH_WINDOW_DAYS`, tested at 7/14/21/30 days). For campaign type 6 this covers **n = 28**, matched against up to 61 never-treated candidates. The comparison is explicitly framed throughout as a **descriptive association, not a causal effect** (association-only vocabulary is used in every script and in the paper). Early-window outcomes (cumulative log-spend, average active campaign-type count in the first 30 days) are strongly and significantly higher for born-treated customers (Welch's t, both p < 0.0001, Cohen's d = 1.34 and 2.10 respectively), robust across all four matching-window widths tested, and only partially explained by observed covariates — a regression-adjustment check (customer scale + device type) shrinks the coefficients by 34–56% but the portfolio-breadth result remains significant after adjustment ([Table 8](#table-8) / [Figure 10](#figure-10)).
+- **`gap_days ≤ threshold` → Track 2 (Born-Treated).** These customers cannot supply a within-customer pre-period by construction, so they are instead compared cross-sectionally against never-treated customers who registered within a matched calendar window (`REG_MATCH_WINDOW_DAYS`, tested at 7/14/21/30 days). For campaign type 6 this covers **n = 28**, matched against up to 61 never-treated candidates. The comparison is explicitly framed throughout as a **descriptive association, not a causal effect** (association-only vocabulary is used in every script and in the paper). Early-window outcomes (cumulative log-spend, average active campaign-type count in the first 30 days) are strongly and significantly higher for born-treated customers (Welch's t, both p < 0.0001, Cohen's d = 1.34 and 2.10 respectively), robust across all four matching-window widths tested, and only partially explained by observed covariates — a regression-adjustment check (customer scale + device type) shrinks the coefficients by 34–56% but the portfolio-breadth result remains significant after adjustment ([Table 8](#table-8) / [Figure 10](#figure-10)). **[§23.2](#232-how-much-unobserved-confounding-can-track-2-tolerate-table-11-table-12-figure-13-figure-14) goes one step further and asks how much *additional*, worst-case unobserved confounding these adjusted estimates could still tolerate — the answer is: less than the confounding already visible in the data.**
 
 A separate check confirmed that the covariate used for adjustment (`customer_total_cost_alltime`) partially overlapped in time with the outcome window itself (an outcome-contamination / post-treatment-bias risk); re-running the adjustment with a covariate that strictly excludes the outcome window produces nearly identical shrinkage percentages (54.7% vs. 56.5% for spend; 34.3% vs. 34.1% for breadth), confirming the original adjusted estimates were not an artifact of covariate contamination ([Table 8](#table-8)).
 
@@ -182,7 +186,7 @@ Because the born-treated/true-switcher classification hinges on an arbitrary-see
 | 3 | 70.0% | 70.0% | 70.0% | 70.0% |
 | 6 | 74.3% | 80.0% | 85.7% | 85.7% |
 
-The maximum within-type variation across all four thresholds is 11.4 percentage points (type 6), safely under a 15-point stability rule set in advance. The homogeneity conclusion (§10) is also confirmed to hold at every threshold ([Table 4](#table-4), [Figure 5](#figure-5)).
+The maximum within-type variation across all four thresholds is 11.4 percentage points (type 6), safely under a 15-point stability rule set in advance. The homogeneity conclusion (§10) is also confirmed to hold at every threshold ([Table 4](#table-4), [Figure 5](#figure-5)). **§23.1 goes further and tests whether the discrete threshold itself should be replaced by a continuous, covariate-based latent-probability classifier — it should not (see below).**
 
 ## 12. Pre-trend analysis
 
@@ -206,6 +210,8 @@ See §7. Reported here for completeness because it is a standard DiD identificat
 | 12 | Track 2 outcome-contamination check (covariate excluding outcome window) | Confirms adjustment result is not a contamination artifact (54.7% vs. 56.5%; 34.3% vs. 34.1% shrinkage) |
 | 13 | Monte Carlo sanity check (`p_born=0` ⇒ Track 1 bias ≈ 0) | PASS, within 3 Monte Carlo SEs |
 | 14 | Monte Carlo theoretical-vs-simulated Track 2 bias | Closed-form 0.200 vs. simulated range [0.198, 0.208] |
+| 15 | Feature-based latent-class mixture reformulation of the gap-day threshold (ridge-stabilized, N=151 pooled) — [§23.1](#231-is-the-discrete-threshold-justified-or-is-it-hiding-a-continuum-table-9-table-10-figure-12-figure-12b) | Bootstrap LRT does **not** reject the single-component null (LR = 6.66, p = 0.22) → discrete threshold supported, not an artifact |
+| 16 | KL-DRO worst-case confounding bound on Track 2 (both outcomes), calibrated to the observed covariate imbalance — [§23.2](#232-how-much-unobserved-confounding-can-track-2-tolerate-table-11-table-12-figure-13-figure-14) | Breakdown ratio 0.24 (log-spend) and 0.78 (portfolio breadth) → both effects are fragile to confounding at or below the level already observed; point estimates are not noise (sign-conditional placebo p<0.005) but are **not** confounding-robust |
 
 ## 14. Figures 1–11
 
@@ -309,6 +315,8 @@ Every figure is grayscale / hatch-and-marker-differentiated only (no color-depen
 - **Role:** The formalized, reusable diagnostic procedure — the paper's core methodological deliverable, illustrating reusability across settings.
 - **Key result:** N/A (schematic).
 - **Generated by:** `make_paper_assets.py::fig11_protocol_flowchart()` (hand-specified schematic, not data-driven).
+
+> **Figures 12, 12B, 13, and 14** (the mixture-model and DRO robustness appendix) are presented in [§23](#23-robustness-appendix-is-the-discrete-gap-day-threshold-defensible-and-how-confounding-robust-is-track-2) below, alongside the checks that produced them.
 
 ## 15. Tables 1–8
 
@@ -419,11 +427,11 @@ Every figure is grayscale / hatch-and-marker-differentiated only (no color-depen
 
 ## 16. Key results — one-paragraph summary
 
-A naive staggered-adoption DiD on this platform's data would report 32 "new adopters" of campaign type 6; in reality, only 9 of them have any usable pre-treatment period, and only 7 are genuine pre-existing customers who added the treatment (the rest were new customers whose very first day on the platform was already the treatment). This ratio (born-treated ≈ 80%) reproduces, statistically indistinguishably, across every other campaign type on the platform (mean 81.3%, homogeneity p > 0.14 under both an asymptotic chi-square and a margin-fixed Monte Carlo exact test, at every gap-day threshold tested from 0 to 7 days). A closed-form Monte Carlo simulation confirms the mechanism is structural rather than dataset-specific: within-customer DiD point estimates stay unbiased as the born-treated share rises, but the effective identifying sample collapses (mirroring the empirical 32→9 pattern) and naive standard errors understate uncertainty by 50%+; cross-sectional comparisons of the excluded born-treated majority, in contrast, inherit a genuine, theoretically-predicted bias from onboarding-specific dynamics that can register as spuriously significant at conventional thresholds in roughly half of simulated samples at the empirically observed contamination rate.
+A naive staggered-adoption DiD on this platform's data would report 32 "new adopters" of campaign type 6; in reality, only 9 of them have any usable pre-treatment period, and only 7 are genuine pre-existing customers who added the treatment (the rest were new customers whose very first day on the platform was already the treatment). This ratio (born-treated ≈ 80%) reproduces, statistically indistinguishably, across every other campaign type on the platform (mean 81.3%, homogeneity p > 0.14 under both an asymptotic chi-square and a margin-fixed Monte Carlo exact test, at every gap-day threshold tested from 0 to 7 days). A closed-form Monte Carlo simulation confirms the mechanism is structural rather than dataset-specific: within-customer DiD point estimates stay unbiased as the born-treated share rises, but the effective identifying sample collapses (mirroring the empirical 32→9 pattern) and naive standard errors understate uncertainty by 50%+; cross-sectional comparisons of the excluded born-treated majority, in contrast, inherit a genuine, theoretically-predicted bias from onboarding-specific dynamics that can register as spuriously significant at conventional thresholds in roughly half of simulated samples at the empirically observed contamination rate. Two further robustness checks close the loop: a feature-based latent-class mixture model **cannot** replace the discrete gap-day threshold with a statistically-justified continuous alternative (bootstrap LRT p=0.22), and a KL-divergence distributionally-robust (DRO) analysis shows the Track 2 associations, while not sampling noise, would be erased by a confounding shift no larger than the covariate imbalance already visible in the data (breakdown ratios 0.24 and 0.78) — see [§23](#23-robustness-appendix-is-the-discrete-gap-day-threshold-defensible-and-how-confounding-robust-is-track-2).
 
 ## 17. Methodological and practical contributions
 
-**Methodological.** (1) Names and formalizes a previously undocumented interaction between observation-window sample construction and rolling-admission platform panels. (2) Introduces a named, reusable diagnostic statistic (Born-Treated Ratio) and a named, algorithmic diagnostic procedure (Gap-Day Diagnostic) that can be applied to any staggered-adoption design on continuously-enrolling panel data. (3) Provides a validated closed-form theoretical benchmark for the size of the resulting bias in cross-sectional ("Track 2"-style) designs, and a validated account of the effective-sample/overconfidence consequence in within-unit ("Track 1"-style) designs.
+**Methodological.** (1) Names and formalizes a previously undocumented interaction between observation-window sample construction and rolling-admission platform panels. (2) Introduces a named, reusable diagnostic statistic (Born-Treated Ratio) and a named, algorithmic diagnostic procedure (Gap-Day Diagnostic) that can be applied to any staggered-adoption design on continuously-enrolling panel data. (3) Provides a validated closed-form theoretical benchmark for the size of the resulting bias in cross-sectional ("Track 2"-style) designs, and a validated account of the effective-sample/overconfidence consequence in within-unit ("Track 1"-style) designs. (4) Formally tests — rather than assumes — that the discrete gap-day cutoff is not concealing a continuum, and quantifies, via a KL-DRO worst-case bound, exactly how much unobserved confounding a downstream descriptive comparison built on this diagnostic can tolerate ([§23](#23-robustness-appendix-is-the-discrete-gap-day-threshold-defensible-and-how-confounding-robust-is-track-2)).
 
 **Practical / design-science.** The bias is, in principle, entirely preventable at the data-collection stage: if a platform records a customer's **original/first-acquisition channel or campaign type** as a separate, immutable field at account creation, the born-treated/true-switcher distinction becomes directly observable rather than something that must be reverse-engineered from panel-entry timing. This is offered as a concrete system-design recommendation.
 
@@ -431,20 +439,21 @@ A naive staggered-adoption DiD on this platform's data would report 32 "new adop
 
 - **Single platform, N=98 core analysis sample.** The Monte Carlo simulation and the four-type internal replication partially compensate for external-validity concerns, but the finding should be replicated on other platforms before the "structural, general phenomenon" claim is treated as fully established.
 - **Track 1 is underpowered by construction.** n=7 (or n=5 under the alternative threshold) does not support formal causal inference; it is reported as case-level, exploratory evidence only, and the paper is explicit that this is a *feature* of correctly applying the diagnostic (it would be dishonest to force a formal estimate out of a sample this size), not a shortcoming of the method.
-- **Track 2 is a descriptive association, not a causal estimate.** Self-selection into a first campaign type is not addressed by matching on calendar registration window and observed covariates alone; the covariate-balance check finds a real imbalance in customer scale, and the regression-adjustment shrinkage (34–56%) should be read as an upper bound on how much of the raw comparison survives adjustment for observables, not as a causal effect size.
+- **Track 2 is a descriptive association, not a causal estimate — and is not confounding-robust.** Self-selection into a first campaign type is not addressed by matching on calendar registration window and observed covariates alone; the covariate-balance check finds a real imbalance in customer scale, and the regression-adjustment shrinkage (34–56%) should be read as an upper bound on how much of the raw comparison survives adjustment for observables, not as a causal effect size. The KL-DRO analysis in [§23.2](#232-how-much-unobserved-confounding-can-track-2-tolerate-table-11-table-12-figure-13-figure-14) sharpens this: both Track 2 outcomes' worst-case lower bounds cross zero at a confounding level *smaller* than what is already observed (breakdown ratios 0.24 and 0.78), so Track 2 should be read as "an association that is not sampling noise" rather than "a robust finding."
+- **The discrete gap-day threshold was formally, not just heuristically, tested against a continuous alternative** ([§23.1](#231-is-the-discrete-threshold-justified-or-is-it-hiding-a-continuum-table-9-table-10-figure-12-figure-12b)) and the data did not support replacing it — but this test used only three structural covariates (campaign type, device type, registration month); richer covariate sets could in principle change this conclusion in other datasets.
 - **Types 4 and 5 were excluded** because zero customers in this sample ever had positive spend under those types — a data-availability limitation, documented rather than concealed.
 - **Future work:** replicate the diagnostic on other platforms and treatment settings; formally extend the closed-form Track 2 bias result to a general novelty-effect functional form; explore whether a design-based fix (e.g., using platform-recorded first-acquisition-channel fields, where available) fully eliminates the need for the gap-day heuristic.
 
 ## 19. Repository structure
 
-The pipeline is organized into six functional groups, executed strictly in order (Group A → Group F). Each group is self-contained: it reads only the outputs of earlier groups plus its own raw inputs, and writes outputs that later groups consume. A separate, non-overlapping companion pipeline (Group G) explores a secondary research question and is intentionally kept out of the main dependency chain (see [§21](#21-companion--exploratory-pipeline-not-part-of-the-main-paper)).
+The pipeline is organized into seven functional groups, executed strictly in order (Group A → Group F, then Group H as an appendix extension). Each group is self-contained: it reads only the outputs of earlier groups plus its own raw inputs, and writes outputs that later groups consume. A separate, non-overlapping companion pipeline (Group G) explores a secondary research question and is intentionally kept out of the main dependency chain (see [§21](#21-companion--exploratory-pipeline-not-part-of-the-main-paper)).
 
 ```
 onboarding-conflation-bias/
 ├── README.md                              # this file
-├── config.py                              # shared paths/env-vars (AD_DATA_ROOT, STEP2_OUT, MC_OUT, REFRAME_OUT, ...)
+├── config.py                              # shared paths/env-vars (AD_DATA_ROOT, STEP2_OUT, MC_OUT, REFRAME_OUT, DRO_OUT, CENSORED_OUT, ...)
 │
-├── figures/                                # Figures 1–11 (PNG; PDF companions produced by make_paper_assets.py)
+├── figures/                                # Figures 1–14 (PNG; PDF companions produced by make_paper_assets.py)
 │   ├── fig01_sample_selection_funnel.png
 │   ├── fig02_cohort_classification.png
 │   ├── fig03_gap_day_distribution.png
@@ -455,9 +464,13 @@ onboarding-conflation-bias/
 │   ├── fig08_mc_se_overconfidence.png
 │   ├── fig09_track1_case_level_att.png
 │   ├── fig10_track2_comparison.png
-│   └── fig11_diagnostic_protocol_flowchart.png
+│   ├── fig11_diagnostic_protocol_flowchart.png
+│   ├── fig12_mixture_beta_ci_comparison.png        # NEW — §23.1
+│   ├── fig12b_posterior_vs_gap_v2.png              # NEW — §23.1 (full N=151 posterior scatter)
+│   ├── fig13_dro_worst_case_bound_vs_epsilon.png   # NEW — §23.2
+│   └── fig14_dro_breakdown_ratio.png               # NEW — §23.2
 │
-├── tables/                                 # Tables 1–8 (CSV; .tex companions produced by make_paper_assets.py)
+├── tables/                                 # Tables 1–13 (CSV; .tex companions produced by make_paper_assets.py)
 │   ├── table01_sample_selection_stages.csv
 │   ├── table02_final_cohort_classification.csv
 │   ├── table03_cross_type_summary.csv
@@ -465,7 +478,12 @@ onboarding-conflation-bias/
 │   ├── table05_gap_threshold_sensitivity.csv
 │   ├── table06_monte_carlo_summary.csv
 │   ├── table07_track1_case_level_att.csv
-│   └── table08_track2_regression_comparison.csv
+│   ├── table08_track2_regression_comparison.csv
+│   ├── table09_mixture_stabilization_comparison.csv    # NEW — §23.1
+│   ├── table10_mixture_beta_coefficients.csv           # NEW — §23.1
+│   ├── table11_dro_worst_case_bounds.csv               # NEW — §23.2
+│   ├── table12_dro_breakdown_summary.csv               # NEW — §23.2
+│   └── table13_robustness_inventory_extension.csv      # NEW — rows 15–16 of §13
 │
 ├── pipeline/                               # ALL CORE SCRIPTS — already executed and validated.
 │   │                                        # Do not re-derive results by hand from this README;
@@ -503,8 +521,16 @@ onboarding-conflation-bias/
 │   ├── group_e_monte_carlo/                # E — Theoretical validation via simulation
 │   │   └── mc_onboarding_conflation_bias.py    # simulates the bias mechanism and validates the diagnostic under it
 │   │
-│   └── group_f_manuscript_assets/          # F — Read-only formatting layer (never re-derives numbers)
-│       └── make_paper_assets.py                # turns saved CSV/JSON into Figures 1–11 / Tables 1–8
+│   ├── group_f_manuscript_assets/          # F — Read-only formatting layer (never re-derives numbers)
+│   │   └── make_paper_assets.py                # turns saved CSV/JSON into Figures 1–11 / Tables 1–8
+│   │
+│   └── group_h_robustness_extension/       # H — §23 robustness appendix (classification + confounding uncertainty)
+│       ├── step4a_mixture_v1_unstabilized.py       # first fit — quasi-complete separation, p0=0.9999 (documented failure)
+│       ├── step4b_mixture_v2_stabilized.py         # ridge (λ=2.0) + sparse-level pooling; N=151 pooled; LRT p=0.22
+│       ├── step4c_posterior_vs_gap_figure.py        # Figure 12B — full N=151 posterior scatter, bubble-sized for overplotting
+│       ├── step5a_dro_calibration.py                # outcome-uncontaminated propensity model; ε_calibrated=0.288
+│       ├── step5b_dro_worst_case_bound.py           # worst-case bound across the ε grid (Table 11 / Figure 13)
+│       └── step5c_dro_breakdown_and_placebo_v4.py   # breakdown ratios + sign-conditional placebo test (Table 12 / Figure 14)
 │
 └── companion_pipeline/                     # G — Companion / exploratory pipeline (secondary research question — §21)
     │                                        #   NOT part of the Onboarding Conflation Bias manuscript
@@ -529,6 +555,7 @@ onboarding-conflation-bias/
 | E | `group_e_monte_carlo/` | Validate the mechanism theoretically, independent of this dataset | Track 1 bias ≈ 0 / SE understatement; Track 2 bias ≈ +0.20 |
 | F | `group_f_manuscript_assets/` | Format already-computed results into figures/tables | `figures/*.png`, `tables/*.csv` |
 | G | `companion_pipeline/` | Secondary, non-overlapping research question (excluded from the manuscript) | Exploratory only — not cited in §14–15 |
+| H | `group_h_robustness_extension/` | Test the discrete gap-day threshold against a continuous alternative; bound Track 2's confounding-robustness | Mixture LRT p=0.22 (threshold retained); DRO breakdown ratios 0.24 / 0.78 |
 
 ## 20. Code-to-result mapping
 
@@ -551,6 +578,12 @@ onboarding-conflation-bias/
 | §10 cross-type generalization / Table 3 / Figure 4 | D | `step2e_all_types_generalization.py` | `df_analysis_master.csv`, raw panel |
 | §11 gap-threshold sensitivity / Table 5 / Figure 5 | D | `step2f_gap_threshold_sensitivity.py` | step2e output (`born_treated_diagnosis_type{T}.csv`) |
 | §10 homogeneity chi-square vs. exact / Table 4 | D | `step2g_homogeneity_chisq_vs_exact.py` | step2f output |
+| §23.1 mixture v1 (unstabilized, documented failure) | H | `step4a_mixture_v1_unstabilized.py` | step2e output pooled across types 1/2/3/6 (N=151) |
+| §23.1 mixture v2 (ridge-stabilized) / Table 9 / Table 10 / Figure 12 | H | `step4b_mixture_v2_stabilized.py` | step4a output + `df_analysis_master.csv` (device_type_mode) |
+| §23.1 Figure 12B (full N=151 posterior scatter) | H | `step4c_posterior_vs_gap_figure.py` | `hard_vs_soft_classification_v2.csv` (step4b output) |
+| §23.2 DRO calibration (ε_calibrated=0.288) | H | `step5a_dro_calibration.py` | step3g clean covariate (`log_total_cost_excl_window`) + Track 2 raw outcomes |
+| §23.2 worst-case bound / Table 11 / Figure 13 | H | `step5b_dro_worst_case_bound.py` | step5a output |
+| §23.2 breakdown ratio + sign-conditional placebo / Table 12 / Figure 14 | H | `step5c_dro_breakdown_and_placebo_v4.py` | step5a, step5b output |
 | Figures 1–11 (formatting only) | F | `make_paper_assets.py` | all of the above (read-only; never re-runs analysis) |
 
 ## 21. Companion / exploratory pipeline (not part of the main paper)
@@ -559,12 +592,14 @@ During scoping, a second research question was explored — "does a new customer
 
 ## 22. Reproducibility framework
 
-**Everything in `figures/` and `tables/` is downstream of already-executed and already-verified code.** To reproduce from scratch, run the groups strictly in order (A → F); Group G is independent and optional.
+**Everything in `figures/` and `tables/` is downstream of already-executed and already-verified code.** To reproduce from scratch, run the groups strictly in order (A → F), then Group H if the robustness appendix is needed; Group G is independent and optional.
 
 ```bash
 export AD_DATA_ROOT="/path/to/master_dataset"
 export STEP2_OUT="$AD_DATA_ROOT/step2_treatment_output"      # default shown; override if needed
 export MC_OUT="./mc_output"
+export CENSORED_OUT="$STEP2_OUT/censored_mixture_output_v2"  # Group H mixture output
+export DRO_OUT="$STEP2_OUT/dro_output_v4"                     # Group H DRO output
 export PAPER_ASSETS_OUT="./paper_assets"
 
 # Group A — Data integrity
@@ -596,9 +631,105 @@ python pipeline/group_e_monte_carlo/mc_onboarding_conflation_bias.py   # Monte C
 # Group F — Manuscript assets (read-only formatting layer — never re-derives numbers)
 python pipeline/group_f_manuscript_assets/make_paper_assets.py   # → paper_assets/figures, paper_assets/tables, generation_log.json
 
+# Group H — Robustness appendix (§23): classification uncertainty (mixture) + inference uncertainty (DRO)
+python pipeline/group_h_robustness_extension/step4a_mixture_v1_unstabilized.py       # documents the separation failure (kept for transparency)
+python pipeline/group_h_robustness_extension/step4b_mixture_v2_stabilized.py         # ridge-stabilized refit — check bootstrap LRT p-value in the log
+python pipeline/group_h_robustness_extension/step4c_posterior_vs_gap_figure.py       # Figure 12B
+python pipeline/group_h_robustness_extension/step5a_dro_calibration.py               # check the IPW covariate-balance sanity print in the log
+python pipeline/group_h_robustness_extension/step5b_dro_worst_case_bound.py
+python pipeline/group_h_robustness_extension/step5c_dro_breakdown_and_placebo_v4.py  # check the sign-conditional placebo p-value in the log
+
 # Group G — Companion / exploratory pipeline (optional, not part of the main manuscript)
 # python companion_pipeline/step0_reframe_sample_reconstruction.py
-# ... (see §21; run independently, not required for Groups A–F)
+# ... (see §21; run independently, not required for Groups A–F/H)
 ```
 
-Each script is idempotent given the same inputs and prints its own verification/sanity checks to the console (e.g., the data-integrity re-verify script prints an explicit `PASS`/`FAIL`; the Monte Carlo script prints an explicit sanity-check pass/fail before reporting any substantive numbers). All environment variables have documented defaults inside each script; none of the reported figures/tables require any manual post-processing beyond what `make_paper_assets.py` performs automatically.
+Each script is idempotent given the same inputs and prints its own verification/sanity checks to the console (e.g., the data-integrity re-verify script prints an explicit `PASS`/`FAIL`; the Monte Carlo script prints an explicit sanity-check pass/fail before reporting any substantive numbers; the Group H mixture and DRO scripts print an explicit `MODEL_JUSTIFIED` flag and a `breakdown_ratio` respectively before reporting any downstream numbers). All environment variables have documented defaults inside each script; none of the reported figures/tables require any manual post-processing beyond what `make_paper_assets.py` performs automatically.
+
+---
+
+## 23. Robustness appendix: is the discrete gap-day threshold defensible, and how confounding-robust is Track 2?
+
+Two additional checks were run after the main pipeline (Groups A–F) and the companion pipeline (Group G) to pre-empt two reviewer objections that a discrete threshold and a matched cross-sectional comparison invite: *"why gap ≤ 1 day exactly?"* and *"how much of Track 2 could be selection?"* Both checks are self-contained and neither result is used to inflate the paper's claims — one is a **negative result** that is reported because it *supports* the existing design choice, and the other is a **bound** that *narrows* the existing claim.
+
+### 23.1 Is the discrete threshold justified, or is it hiding a continuum? (Table 9, Table 10, Figure 12, Figure 12B)
+
+The Gap-Day Diagnostic classifies adopters with a hard cutoff (`gap_days ≤ 1` → born-treated). To test whether this hides a real continuum of uncertainty that a probabilistic classifier would capture better, a feature-based two-component latent-class mixture model was fit to `gap_days` pooled across all four campaign types (**N = 151**), with campaign type, device type, and registration month as covariates in a logistic gating function (following the censored-classification approach of Ding, Rong & Huh 2024, *M&SOM*). An unstabilized first fit produced quasi-complete separation in the gate (coefficient 95% bootstrap CIs up to ±22.8) and a degenerate Geometric component (p0 = 0.9999) — reported here rather than hidden, since it is itself informative (Table 9, column "v1"). A stabilized re-fit pooled sparse covariate levels (min. cell size 10) and added an L2 (ridge, λ = 2.0) penalty to the gate's M-step.
+
+**Table 9** and **Figure 12** report the before/after comparison: stabilization resolves the separation (max coefficient-CI half-width falls from ≈22.8 to 0.74) without changing the substantive conclusion.
+
+<p align="center"><img src="figures/fig12_mixture_beta_ci_comparison.png" width="720"></p>
+
+<a name="table-9"></a>
+**Table 9. Mixture-model stabilization comparison (v1 unstabilized vs. v2 ridge-stabilized)** — `tables/table09_mixture_stabilization_comparison.csv`
+
+| Quantity | v1 (unstabilized) | v2 (ridge-stabilized) |
+|---|---:|---:|
+| p0 (Geometric component, point estimate) | 0.9999 | 0.9872 |
+| p0, 95% bootstrap CI | [0.954, 0.9999] | [0.9489, 0.9999] |
+| r1 (NegBinom component, point estimate) | 0.3421 | 0.4559 |
+| p1 (NegBinom component, point estimate) | 0.0213 | 0.0243 |
+| Observed LR statistic (mixture vs. single-component null) | 8.456 | 6.660 |
+| Parametric-bootstrap LRT *p*-value | 0.38 | **0.22** |
+| Max β 95% CI half-width (separation diagnostic) | 22.8 | **0.74** |
+| N with posterior in ambiguous band [0.2, 0.8] | 0 | 5 |
+| N where hard/soft classification disagree | 5 | 5 |
+| AIC / BIC | 430.10 / 457.26 | 431.90 / 459.05 |
+
+<a name="table-10"></a>
+**Table 10. Logistic-gate coefficients with 95% bootstrap CIs, v1 vs. v2** — `tables/table10_mixture_beta_coefficients.csv`
+
+| Covariate | v1 point | v1 95% CI | v2 point | v2 95% CI |
+|---|---:|---|---:|---|
+| Intercept | 1.563 | [0.011, 23.308] | 1.291 | [0.594, 2.068] |
+| Campaign type = 2 | 1.832 | [0.350, 22.577] | 0.668 | [0.202, 1.097] |
+| Campaign type = 3 | -0.295 | [-2.373, 22.299] | -0.215 | [-0.925, 0.504] |
+| Campaign type = 6 | -0.103 | [-1.352, 0.967] | -0.115 | [-0.724, 0.504] |
+| Device type = P | 0.428 | [-1.464, 22.212] | 0.143 | [-0.682, 0.800] |
+| Registration month = 2026-01 | -0.904 | [-22.878, 0.765] | -0.281 | [-0.735, 0.206] |
+
+A parametric-bootstrap likelihood-ratio test (McLachlan & Peel 2000 regularity-condition workaround, since the standard asymptotic χ² approximation does not apply to a test on the number of mixture components) on the **stabilized** model does **not** reject the single-component null (LR = 6.66, bootstrap p = **0.22**, B = 150). This is reported as a **negative robustness result**: the data do not support replacing the discrete threshold with a continuous latent-probability reformulation, which is independent evidence — on top of the 0/1/3/7-day sensitivity analysis in [§11](#11-gap-threshold-sensitivity) and the Fisher/Monte-Carlo-exact cross-check in [§10](#10-cross-type-generalization-and-homogeneity-testing) — that the born-treated/true-switcher boundary in this data is close to genuinely discrete rather than an artifact of an arbitrary cutoff.
+
+**Figure 12B** shows this directly for all N=151 pooled adopters: under the stabilized model, only 5 customers fall in the ambiguous posterior band [0.2, 0.8] and the overwhelming majority of the mass sits at the extremes (bubble area = customer count, since 118/151 customers share `gap_days = 0`).
+
+<p align="center"><img src="figures/fig12b_posterior_vs_gap_v2.png" width="800"></p>
+
+Soft-reweighted Track 1 / Track 2 estimates computed under the (statistically unjustified) mixture model are **not** reported as substantive results anywhere in this repository; they were computed only as a diagnostic by-product during model development and are archived in `results/robustness/mixture/` for transparency, not cited as findings.
+
+### 23.2 How much unobserved confounding can Track 2 tolerate? (Table 11, Table 12, Figure 13, Figure 14)
+
+Table 8's regression adjustment already shows the two Track 2 coefficients shrinking 34–56% under an outcome-uncontaminated covariate; this section quantifies exactly how much *further*, worst-case, unobserved confounding they can survive. A standard (non-mixture) logistic propensity model was fit on the same outcome-uncontaminated covariate used in Table 8 (`log_total_cost_excl_window`, `device_type_mode`). The Kullback–Leibler divergence required to IPW-reweight the matched control group onto the born-treated group's covariate distribution (**ε_calibrated = 0.288**) was used to calibrate a distributionally-robust (DRO) ambiguity radius, and the worst-case Track 2 effect was computed as this radius is scaled from 0.25× to 8× the calibration.
+
+<p align="center"><img src="figures/fig13_dro_worst_case_bound_vs_epsilon.png" width="720"></p>
+
+<a name="table-11"></a>
+**Table 11. DRO worst-case effect bound across the ε grid** — `tables/table11_dro_worst_case_bounds.csv`
+
+| ε multiplier | ε | Worst-case bound (log-spend) | Naive diff (log-spend) | Worst-case bound (breadth) | Naive diff (breadth) |
+|---:|---:|---:|---:|---:|---:|
+| 0.25× | 0.072 | -0.891 | 71.841 | +0.335 | 0.7528 |
+| 0.5× | 0.144 | -31.344 | 71.841 | +0.155 | 0.7528 |
+| 1.0× (calibrated) | 0.288 | -74.109 | 71.841 | -0.104 | 0.7528 |
+| 2.0× | 0.576 | -132.875 | 71.841 | -0.476 | 0.7528 |
+| 4.0× | 1.151 | -210.709 | 71.841 | -1.000 | 0.7528 |
+| 8.0× | 2.303 | -308.397 | 71.841 | -1.632 | 0.7528 |
+
+Both outcomes' worst-case lower bounds cross zero at a **breakdown** radius smaller than the calibrated one:
+
+<p align="center"><img src="figures/fig14_dro_breakdown_ratio.png" width="520"></p>
+
+<a name="table-12"></a>
+**Table 12. DRO breakdown-point summary and sign-conditional placebo test** — `tables/table12_dro_breakdown_summary.csv`
+
+| Outcome | Naive diff | ε calibrated | Breakdown ε | Breakdown ratio | n_eff at breakdown (born-treated / control) | Placebo *p* (sign-conditional, n=200) | step3g adjusted coef / *p* / still sig.? |
+|---|---:|---:|---:|---:|---|---:|---|
+| log-spend (30-day cumulative) | 71.841 | 0.288 | 0.070 | **0.24** | 23.55/28 · 52.99/60 | <0.005 | 32.52 / 0.094 / No |
+| Portfolio breadth (30-day mean) | 0.753 | 0.288 | 0.225 | **0.78** | 18.16/28 · 36.76/60 | <0.005 | 0.495 / <0.0001 / **Yes** |
+
+Log-spend breaks down at **0.24×** the calibrated confounding level, and portfolio breadth at **0.78×** — i.e., a distributional shift no larger than the covariate imbalance already documented in Table 8 is, in the worst case, sufficient to erase both point estimates. The `n_eff` (Kish effective sample size) reported at the breakdown radius is not small relative to the nominal sample (23.6/28 and 53.0/60 for log-spend; 18.2/28 and 36.8/60 for breadth), which rules out the breakdown being an artifact of a handful of outlier customers rather than a genuine property of the outcome distributions.
+
+A **sign-conditional** placebo permutation test (200 random re-assignments of the born-treated label that happen to reproduce the observed sign of the naive effect — an unconditional, sign-agnostic placebo distribution is degenerate near zero for a structural reason and is not used for inference, see the script changelog) confirms the point estimates themselves are not sampling noise (*p* < 0.005 for both outcomes) — **but this is a separate question from confounding-robustness, and does not change the breakdown-ratio conclusion.** Track 2 is accordingly reported throughout this repository as a descriptive association whose sign and existence are well-supported but whose magnitude is **not** robust to the level of unobserved confounding already visible in the data, rather than as a robust finding.
+
+### 23.3 Suggested placement in the manuscript
+
+§23.1 belongs in the paper's robustness section as an extension of [§11](#11-gap-threshold-sensitivity) (gap-threshold sensitivity) — same question ("is the threshold arbitrary?"), independent method, same answer (no). §23.2 belongs immediately after Table 8 in [§8](#8-the-gap-day-diagnostic-and-the-track-1--track-2-split), as the natural next question once a regression-adjustment shrinkage is reported. Neither result changes the paper's central claim (the existence, structural nature, and cross-type homogeneity of Onboarding Conflation Bias in §7–§11); both narrow or defend the downstream two-track demonstration in §8, consistent with the paper's positioning as a methodological/design-science contribution rather than a claim about campaign-effectiveness magnitudes. This section is kept as a standalone appendix in the README (rather than spliced into §8/§11 directly) so that the repository's provenance — which checks were run *after* the main pipeline, specifically to pre-empt reviewer objections — remains transparent; a camera-ready manuscript would inline §23.1 into §11 and §23.2 into §8 as described above.
