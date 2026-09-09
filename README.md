@@ -2,7 +2,7 @@
 
 **A reliability-aware diagnostic protocol for treatment-onset misclassification in rolling-admission observational panels — with quantified reliability bounds on both the classification and the downstream inference.**
 
-> This repository is not primarily about an advertising-effect estimate. Its deliverable is a **diagnostic protocol** (Figure 11) that determines whether the treatment-onset dates recorded in an observation-window-filtered panel are trustworthy enough to support downstream causal analysis — and, if they are not fully trustworthy, exactly how much uncertainty remains after diagnosis. The advertising-platform dataset used throughout is the **demonstration environment** in which the protocol was discovered and validated, not the object of study. Every figure, table, and script that produced this protocol and its reliability bounds is included below, already executed.
+> This repository is not primarily about an advertising-effect estimate. Its deliverable is a **diagnostic protocol** (Figure 11) that determines whether the treatment-onset dates recorded in an observation-window-filtered panel are trustworthy enough to support downstream causal analysis — and, if they are not fully trustworthy, exactly how much uncertainty remains after diagnosis. Every figure, table, and script that produced this protocol and its reliability bounds is included below, already executed.
 
 ---
 
