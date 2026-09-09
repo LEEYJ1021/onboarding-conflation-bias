@@ -1,0 +1,3 @@
+outcome,naive_diff,pooled_variance,eps_calibrated,breakdown_eps,breakdown_ratio_to_calibrated,variance_normalized_breakdown_index,n_eff_born_treated_at_breakdown,n_born_treated,n_eff_control_at_breakdown,n_control,placebo_sign_match_rate,placebo_n_matched,placebo_p_value_robustness,step3g_adjusted_coef,step3g_adjusted_pvalue,step3g_still_significant
+log_spend_safe (30-day cumulative log-spend),71.8411,12035.4882,0.2879,0.0702,0.244,0.327,23.55,28,52.99,60,0.45,200,<0.005,32.5189,0.0935,False
+n_campaign_types_active (30-day mean portfolio breadth),0.7528,0.4313,0.2879,0.2246,0.78,0.342,18.16,28,36.76,60,0.49,200,<0.005,0.4946,0.0,True

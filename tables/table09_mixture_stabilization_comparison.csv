@@ -1,0 +1,13 @@
+quantity,v1_unstabilized,v2_stabilized
+"p0 (Geometric component, point estimate)",0.9999,0.9872
+"p0, 95% bootstrap CI lower",0.954,0.9489
+"p0, 95% bootstrap CI upper",0.9999,0.9999
+"r1 (NegBinom component, point estimate)",0.3421,0.4559
+"p1 (NegBinom component, point estimate)",0.0213,0.0243
+Observed LR statistic (mixture vs single-component null),8.456,6.6602
+Parametric bootstrap LRT p-value,0.38,0.22
+Max beta 95% CI half-width (separation diagnostic),22.8,0.741
+"N customers with posterior in ambiguous band [0.2,0.8]",0.0,5.0
+"N customers, hard/soft classification disagree",5.0,5.0
+AIC,430.1,431.9
+BIC,457.26,459.05

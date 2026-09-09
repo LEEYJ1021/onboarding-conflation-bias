@@ -1,0 +1,7 @@
+eps_multiplier_of_calibration,eps_log_spend_safe,worst_case_bound_log_spend_safe,naive_diff_log_spend_safe,eps_n_campaign_types_active,worst_case_bound_n_campaign_types_active,naive_diff_n_campaign_types_active
+0.25,0.072,-0.8909,71.8411,0.072,0.3346,0.7528
+0.5,0.144,-31.3438,71.8411,0.144,0.1551,0.7528
+1.0,0.288,-74.1092,71.8411,0.288,-0.1038,0.7528
+2.0,0.576,-132.8752,71.8411,0.576,-0.4761,0.7528
+4.0,1.151,-210.7088,71.8411,1.151,-0.9998,0.7528
+8.0,2.303,-308.397,71.8411,2.303,-1.632,0.7528

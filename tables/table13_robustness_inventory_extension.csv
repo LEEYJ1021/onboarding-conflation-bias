@@ -1,0 +1,3 @@
+check_number,check,result
+15,"Feature-based latent-class mixture reformulation of gap-day threshold (ridge-stabilized, N=151 pooled)","Bootstrap LRT does not reject single-component null (LR=6.66, p=0.22) -> discrete threshold supported, not an artifact"
+16,"DRO worst-case confounding bound on Track 2 (both outcomes), calibrated to observed covariate imbalance",Breakdown ratio 0.24 (log-spend) and 0.78 (portfolio breadth) -> both effects fragile to confounding at or below the observed imbalance level; point estimates not noise (sign-conditional placebo p<0.005) but not confounding-robust
